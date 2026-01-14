@@ -76,12 +76,18 @@
         /* Animation for the path - 使用多個選擇器確保命中 */
         .leaflet-interactive,
         path.leaflet-interactive,
-        polyline.leaflet-interactive {
-            stroke-dasharray: 10, 10;
-            animation: dash 30s linear infinite;
+        polyline.leaflet-interactive,
+        .route-line-animated,
+        path[stroke="#6366f1"],
+        path[stroke="rgb(99, 102, 241)"] {
+            stroke-dasharray: 10, 10 !important;
+            animation: dash 30s linear infinite !important;
         }
         
         @keyframes dash {
+            from {
+                stroke-dashoffset: 0;
+            }
             to {
                 stroke-dashoffset: -1000;
             }
@@ -496,25 +502,41 @@
 
                 if (routePoints.length > 0) {
                     try {
-                        // 繪製路線並加入動畫 class
+                        // 繪製路線
                         polylineRef.current = L.polyline(routePoints, {
                             color: '#6366f1', 
                             weight: 3, 
                             opacity: 0.6, 
                             dashArray: '10, 10', 
                             lineCap: 'round',
-                            className: 'route-line-animated'
+                            className: 'route-line-animated',
+                            interactive: true
                         }).addTo(map);
                         
-                        // 強制加入動畫 class (使用 DOM 操作)
+                        // 多種方法確保動畫生效
                         setTimeout(() => {
-                            const pathElements = map.getPane('overlayPane').querySelectorAll('path');
-                            pathElements.forEach(path => {
-                                if (path.getAttribute('stroke') === '#6366f1' || path.style.stroke === 'rgb(99, 102, 241)') {
-                                    path.style.strokeDasharray = '10, 10';
-                                    path.style.animation = 'dash 30s linear infinite';
-                                }
-                            });
+                            // 方法1: 直接設定 polyline 的 path 元素
+                            if (polylineRef.current && polylineRef.current._path) {
+                                const pathElement = polylineRef.current._path;
+                                pathElement.style.strokeDasharray = '10, 10';
+                                pathElement.style.animation = 'dash 30s linear infinite';
+                                pathElement.classList.add('route-line-animated');
+                            }
+                            
+                            // 方法2: 查詢所有藍色路徑
+                            const overlayPane = map.getPane('overlayPane');
+                            if (overlayPane) {
+                                const pathElements = overlayPane.querySelectorAll('path');
+                                pathElements.forEach(path => {
+                                    const stroke = path.getAttribute('stroke');
+                                    const styleStroke = window.getComputedStyle(path).stroke;
+                                    if (stroke === '#6366f1' || styleStroke === 'rgb(99, 102, 241)') {
+                                        path.style.strokeDasharray = '10, 10';
+                                        path.style.animation = 'dash 30s linear infinite';
+                                        path.classList.add('route-line-animated');
+                                    }
+                                });
+                            }
                         }, 100);
                         
                         // Add arrow decorators
@@ -1319,7 +1341,22 @@
                                                         {item.spots && item.spots.length > 0 && (
                                                             <div className="flex flex-wrap gap-1 mt-2">
                                                                 {item.spots.map((spot, idx) => (
-                                                                    <span key={idx} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">📍 {spot.name}</span>
+                                                                    <span 
+                                                                        key={idx} 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setActiveId(item.id);
+                                                                            // 找到地圖實例並飛到景點
+                                                                            const mapInstance = document.querySelector('.leaflet-container')?._leaflet_map;
+                                                                            if (mapInstance && spot.coords) {
+                                                                                mapInstance.flyTo(spot.coords, 17, { animate: true, duration: 1.2 });
+                                                                            }
+                                                                        }}
+                                                                        className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 hover:bg-blue-100 hover:border-blue-400 hover:text-blue-700 cursor-pointer transition-all"
+                                                                        title={`點擊飛到 ${spot.name}`}
+                                                                    >
+                                                                        📍 {spot.name}
+                                                                    </span>
                                                                 ))}
                                                             </div>
                                                         )}
