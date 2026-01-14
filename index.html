@@ -364,31 +364,57 @@
                 if (!mapContainerRef.current) return;
                 if (mapInstanceRef.current) return; // Prevent double init
 
-                try {
-                    const map = L.map(mapContainerRef.current, {
-                        zoomControl: false,
-                        attributionControl: true
-                    }).setView([38.5, 26.0], 5);
-
-                    // 使用 OpenStreetMap 官方 tile (更穩定)
-                    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                        maxZoom: 19,
-                        crossOrigin: true
-                    }).addTo(map);
-
-                    L.control.zoom({ position: 'topright' }).addTo(map);
-                    mapInstanceRef.current = map;
-                    
-                    console.log('Map initialized successfully');
-                } catch (e) {
-                    console.error("Map Init Error:", e);
+                // 確保 Leaflet 已載入
+                if (typeof L === 'undefined') {
+                    console.warn('Leaflet not loaded yet, retrying...');
+                    const timer = setTimeout(() => {
+                        // 強制重新渲染以觸發 useEffect
+                        if (mapContainerRef.current && !mapInstanceRef.current) {
+                            mapContainerRef.current.innerHTML = '';
+                        }
+                    }, 100);
+                    return () => clearTimeout(timer);
                 }
+
+                // 延遲初始化，確保 DOM 完全準備好
+                const initTimer = setTimeout(() => {
+                    try {
+                        if (!mapContainerRef.current || mapInstanceRef.current) return;
+
+                        const map = L.map(mapContainerRef.current, {
+                            zoomControl: false,
+                            attributionControl: true,
+                            preferCanvas: true // 提升效能
+                        }).setView([38.5, 26.0], 5);
+
+                        // 使用 OpenStreetMap 官方 tile (更穩定)
+                        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                            maxZoom: 19,
+                            crossOrigin: true
+                        }).addTo(map);
+
+                        L.control.zoom({ position: 'topright' }).addTo(map);
+                        mapInstanceRef.current = map;
+
+                        // 確保地圖尺寸正確
+                        setTimeout(() => {
+                            if (map) map.invalidateSize();
+                        }, 100);
+                    } catch (e) {
+                        console.error("Map Init Error:", e);
+                    }
+                }, 50);
 
                 // Cleanup
                 return () => {
+                    clearTimeout(initTimer);
                     if (mapInstanceRef.current) {
-                        mapInstanceRef.current.remove();
+                        try {
+                            mapInstanceRef.current.remove();
+                        } catch (e) {
+                            console.error("Map cleanup error:", e);
+                        }
                         mapInstanceRef.current = null;
                     }
                 };
