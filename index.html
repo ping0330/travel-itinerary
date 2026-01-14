@@ -475,7 +475,7 @@
                 if (routePoints.length > 0) {
                     try {
                         polylineRef.current = L.polyline(routePoints, {
-                            color: '#6366f1', weight: 3, opacity: 0.6, dashArray: '10, 10', lineCap: 'round', className: 'animate-dash'
+                            color: '#6366f1', weight: 3, opacity: 0.6, dashArray: '10, 10', lineCap: 'round'
                         }).addTo(map);
                         
                         // Add arrow decorators
@@ -531,7 +531,16 @@
 
                                 const m = L.marker(coords, { icon }).addTo(map);
                                 m.bindPopup(`<b>${title}</b>`);
-                                m.on('click', () => onMarkerClick(item.id));
+                                if (isSpot) {
+                                    // 景點標記：飛到景點位置
+                                    m.on('click', () => {
+                                        map.flyTo(coords, 16, { animate: true, duration: 1 });
+                                        onMarkerClick(item.id);
+                                    });
+                                } else {
+                                    // 日期標記：正常切換
+                                    m.on('click', () => onMarkerClick(item.id));
+                                }
                                 return m;
                             } catch (e) {
                                 console.error("Error creating marker:", e);
