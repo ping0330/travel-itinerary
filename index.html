@@ -1130,12 +1130,7 @@
             return (
                 <div className="flex flex-col h-full overflow-hidden relative text-slate-800">
                     
-                    {/* Desktop: 傳統並排 | Mobile: 全螢幕切換 */}
-                    <div className="hidden md:flex md:flex-row h-full overflow-hidden">
-                        {/* Desktop Sidebar */}
-                        <div className={`w-full md:w-[480px] bg-white shadow-xl z-20 flex flex-col transition-all duration-300 md:relative h-full border-r border-slate-200`}>
-                    
-                    {/* Picking Banner */}
+                    {/* Picking Banner - 對所有裝置顯示 */}
                     {pickingTarget && (
                         <div onClick={() => setPickingTarget(null)} className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[2000] bg-blue-600 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 cursor-pointer hover:bg-blue-700 transition animate-bounce">
                             <Icons.Crosshair />
@@ -1277,7 +1272,7 @@
                         </div>
                     )}
 
-                    {/* Mobile View */}
+                    {/* ========== Mobile View ========== */}
                     <div className="md:hidden flex flex-col h-full">
                         {/* Mobile Top Bar */}
                         <div className="bg-white border-b border-slate-200 p-3 flex items-center justify-between z-30">
@@ -1288,8 +1283,25 @@
                                 <button onClick={() => setShowMenu(!showMenu)} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100">
                                     <Icons.Menu />
                                 </button>
+                                {showMenu && (
+                                    <div className="absolute right-3 top-14 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50">
+                                        <button onClick={() => { generateShareLink(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-blue-50 flex items-center gap-2">
+                                            <Icons.Link /> 產生分享連結
+                                        </button>
+                                        <button onClick={() => { exportJSON(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-green-50 flex items-center gap-2">
+                                            <Icons.Download /> 匯出 JSON
+                                        </button>
+                                        <button onClick={() => { importJSON(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-purple-50 flex items-center gap-2">
+                                            <Icons.Upload /> 匯入 JSON
+                                        </button>
+                                        <hr className="my-1 border-slate-200" />
+                                        <button onClick={() => { setShowHistory(true); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-blue-50 flex items-center gap-2">
+                                            <Icons.History /> 版本歷史
+                                        </button>
+                                    </div>
+                                )}
                                 {isEditing && (
-                                    <button onClick={() => { setIsEditing(false); setPickingTarget(null); }} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-green-100 text-green-700">
+                                    <button onClick={() => { setIsEditing(false); setPickingTarget(null); }} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-green-100 text-green-700 flex items-center gap-1">
                                         <Icons.Save /> 完成
                                     </button>
                                 )}
@@ -1394,238 +1406,170 @@
                         </div>
                     </div>
 
-                    {/* Desktop Sidebar (continued from earlier) */}
-                    {showHistory && (
-                        <div className="absolute inset-0 bg-black/50 z-[3000] flex items-center justify-center p-4" onClick={() => setShowHistory(false)}>
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                                {/* Header */}
-                                <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-blue-50 to-purple-50">
+                    {/* ========== Desktop View ========== */}
+                    <div className="hidden md:flex md:flex-row h-full overflow-hidden">
+                        {/* Desktop Sidebar */}
+                        <div className="w-[480px] bg-white shadow-xl z-20 flex flex-col h-full border-r border-slate-200">
+                            {/* Header */}
+                            <div className="p-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h1 className="text-lg font-bold flex items-center gap-2"><span>🌍</span> {itinerary[0].title}</h1>
                                     <div className="flex items-center gap-2">
-                                        <Icons.History />
-                                        <h2 className="font-bold text-lg">版本歷史</h2>
-                                    </div>
-                                    <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
-                                </div>
-                                
-                                {/* Content */}
-                                <div className="flex-1 overflow-y-auto p-4 custom-scroll">
-                                    {getHistory().length === 0 ? (
-                                        <div className="text-center py-12 text-slate-400">
-                                            <Icons.History />
-                                            <p className="mt-2">尚無版本歷史記錄</p>
+                                        <div className="relative">
+                                            <button onClick={() => setShowMenu(!showMenu)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                                                <Icons.Menu />
+                                            </button>
+                                            {showMenu && (
+                                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50">
+                                                    <button onClick={() => { generateShareLink(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-blue-50 flex items-center gap-2">
+                                                        <Icons.Link /> 產生分享連結
+                                                    </button>
+                                                    <button onClick={() => { exportHTML(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-green-50 flex items-center gap-2">
+                                                        <Icons.Download /> 匯出 HTML
+                                                    </button>
+                                                    <button onClick={() => { exportJSON(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-green-50 flex items-center gap-2">
+                                                        <Icons.Download /> 匯出 JSON
+                                                    </button>
+                                                    <button onClick={() => { importJSON(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-purple-50 flex items-center gap-2">
+                                                        <Icons.Upload /> 匯入 JSON
+                                                    </button>
+                                                    <hr className="my-1 border-slate-200" />
+                                                    <button onClick={() => { setShowHistory(true); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-blue-50 flex items-center gap-2">
+                                                        <Icons.History /> 版本歷史
+                                                    </button>
+                                                    <button onClick={() => { resetToOriginal(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-red-50 text-red-600 flex items-center gap-2">
+                                                        <Icons.RefreshCw /> 重置為原始
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {getHistory().map((version, index) => (
-                                                <div key={version.id} className="border border-slate-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-md transition">
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <span className="font-bold text-sm text-blue-600">{version.action}</span>
-                                                                {index === 0 && (
-                                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">最新</span>
-                                                                )}
+                                        <button onClick={() => { setIsEditing(!isEditing); setPickingTarget(null); }} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition ${isEditing ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                                            {isEditing ? <><Icons.Save /> 完成</> : <><Icons.Edit /> 編輯</>}
+                                        </button>
+                                    </div>
+                                </div>
+                                {isEditing ? (
+                                    <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-100">💡 點擊「📍」再點地圖可設定座標。點擊「+ 新增景點」可添加多個地點。編輯會自動儲存。</div>
+                                ) : (
+                                    <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-100 flex gap-2 items-center">
+                                        <Icons.Eye />
+                                        <span>目前為預覽模式。點擊下方列表可飛往該地點。</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* List */}
+                            <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-3 bg-slate-50">
+                                {itinerary.map((item) => {
+                                    if (item.id === 0) return (
+                                        <div key={item.id} className="p-4 mb-2 bg-gradient-to-r from-slate-800 to-slate-700 text-white rounded-xl shadow-lg">
+                                            <h3 className="font-bold text-lg mb-1">{item.title}</h3>
+                                            <p className="text-xs text-slate-200 opacity-90">{item.desc}</p>
+                                        </div>
+                                    );
+                                    const isActive = activeId === item.id;
+                                    const isTurkey = item.city.includes('Turkey') || item.city.includes('Istanbul');
+                                    const badgeColor = isTurkey ? 'bg-orange-100 text-orange-700' : (item.city.includes('TPE') ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700');
+
+                                    return (
+                                        <div key={item.id} onClick={() => !isEditing && !pickingTarget && setActiveId(item.id)} className={`rounded-xl p-4 border transition-all duration-200 bg-white relative cursor-pointer ${isActive && !isEditing ? 'border-blue-500 shadow-md ring-1 ring-blue-100 transform scale-[1.02]' : 'border-slate-200 hover:border-blue-300 shadow-sm hover:shadow-md'}`}>
+                                            <div className="flex items-start gap-3">
+                                                <div className={`flex flex-col items-center justify-center w-12 h-12 rounded-lg shrink-0 ${badgeColor}`}>
+                                                    <span className="text-[10px] font-bold uppercase">{item.day.split(' ')[0]}</span>
+                                                    <span className="text-sm font-bold">{item.day.split(' ')[1]}</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    {isEditing ? (
+                                                        <div className="space-y-3">
+                                                            <div className="flex gap-2">
+                                                                <input className="w-1/3 text-xs border border-slate-300 rounded px-2 py-1" value={item.date} onChange={(e) => handleDayChange(item.id, 'date', e.target.value)} />
+                                                                <input className="w-2/3 text-xs border border-slate-300 rounded px-2 py-1 font-bold" value={item.title} onChange={(e) => handleDayChange(item.id, 'title', e.target.value)} />
                                                             </div>
-                                                            <div className="flex items-center gap-3 text-xs text-slate-500">
-                                                                <span className="flex items-center gap-1">
-                                                                    <Icons.User />
-                                                                    {version.editor}
-                                                                </span>
-                                                                <span className="flex items-center gap-1">
-                                                                    <Icons.Clock />
-                                                                    {formatDate(version.timestamp)}
-                                                                </span>
+                                                            <div className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
+                                                                <span className="text-[10px] font-bold text-slate-500">中心:</span>
+                                                                <span className="text-[10px] font-mono text-slate-600 truncate">{item.coords[0]}, {item.coords[1]}</span>
+                                                                <button onClick={(e) => { e.stopPropagation(); startPicking(item.id, null); }} className="ml-auto flex items-center gap-1 text-[10px] bg-white border border-slate-300 px-2 py-1 rounded hover:text-blue-600"><Icons.Target /> 定位</button>
+                                                            </div>
+                                                            <div className="space-y-2 pl-2 border-l-2 border-slate-200">
+                                                                {item.spots && item.spots.map((spot, sIdx) => (
+                                                                    <div key={sIdx} className="bg-slate-50 p-2 rounded border border-slate-200 relative">
+                                                                        <div className="flex gap-2 mb-1">
+                                                                            <input className="w-1/2 text-xs border border-slate-300 rounded px-1 py-0.5 font-bold" placeholder="景點" value={spot.name} onChange={(e) => handleSpotChange(item.id, sIdx, 'name', e.target.value)} />
+                                                                            <input className="w-1/2 text-xs border border-slate-300 rounded px-1 py-0.5" placeholder="描述" value={spot.desc} onChange={(e) => handleSpotChange(item.id, sIdx, 'desc', e.target.value)} />
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="text-[10px] text-slate-400 font-mono">{spot.coords ? `${spot.coords[0]}, ...` : '-'}</span>
+                                                                            <div className="flex gap-1">
+                                                                                <button onClick={(e) => { e.stopPropagation(); moveSpot(item.id, sIdx, 'up'); }} disabled={sIdx === 0} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed" title="上移"><Icons.ChevronUp /></button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); moveSpot(item.id, sIdx, 'down'); }} disabled={sIdx === item.spots.length - 1} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed" title="下移"><Icons.ChevronDown /></button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); setSearchingSpot({ dayId: item.id, spotIndex: sIdx, query: spot.name }); }} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-green-600" title="搜尋"><Icons.Search /></button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); startPicking(item.id, sIdx); }} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-blue-600" title="地圖點選">📍</button>
+                                                                                <button onClick={() => removeSpot(item.id, sIdx)} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-red-600"><Icons.Trash /></button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                                <button onClick={() => addSpot(item.id)} className="w-full py-1 text-xs text-slate-500 border border-dashed border-slate-300 rounded hover:bg-slate-100 hover:text-blue-600">+ 新增景點</button>
                                                             </div>
                                                         </div>
-                                                        <button 
-                                                            onClick={() => {
-                                                                if (confirm(`確定要恢復到此版本嗎？\n\n${version.action}\n編輯者：${version.editor}\n時間：${formatDate(version.timestamp)}\n\n目前版本將會被保存到歷史記錄。`)) {
-                                                                    restoreVersion(version.id);
-                                                                }
-                                                            }}
-                                                            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-bold whitespace-nowrap"
-                                                        >
-                                                            恢復
-                                                        </button>
-                                                    </div>
+                                                    ) : (
+                                                        <>
+                                                            <h3 className={`font-bold text-sm ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{item.title}</h3>
+                                                            <div className="flex items-center gap-1 text-xs text-slate-500 mb-1"><Icons.MapPin /> {item.city}</div>
+                                                            <p className="text-xs text-slate-600 leading-relaxed mb-2">{item.desc}</p>
+                                                            {item.spots && item.spots.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                                    {item.spots.map((spot, idx) => (
+                                                                        <span 
+                                                                            key={idx} 
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setActiveId(item.id);
+                                                                                if (mapRef.current && spot.coords) {
+                                                                                    mapRef.current.flyToSpot(spot.coords, 17);
+                                                                                }
+                                                                            }}
+                                                                            className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 hover:bg-blue-100 hover:border-blue-400 hover:text-blue-700 cursor-pointer transition-all"
+                                                                            title={`點擊飛到 ${spot.name}`}
+                                                                        >
+                                                                            📍 {spot.name}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        
+                        {/* Desktop Map Area */}
+                        <div className="flex-1 relative h-full bg-slate-200">
+                            <MapComponent activeId={activeId} data={itinerary} onMarkerClick={setActiveId} pickingMode={!!pickingTarget} onPickLocation={handlePickLocation} mapRef={mapRef} />
+
+                            {activeItem && activeItem.id !== 0 && !isEditing && !pickingTarget && (
+                                <div className="absolute bottom-6 right-6 w-80 bg-white/95 backdrop-blur rounded-xl shadow-2xl p-4 z-[1000] border border-slate-200">
+                                    <h2 className="font-bold text-lg text-slate-800 mb-1">{activeItem.title}</h2>
+                                    {activeItem.spots && activeItem.spots.length > 0 ? (
+                                        <div className="space-y-1">
+                                            {activeItem.spots.map((s, i) => (
+                                                <div key={i} className="text-xs text-slate-600 flex gap-2">
+                                                    <span className="font-bold text-blue-600">·</span> 
+                                                    <span><span className="font-semibold">{s.name}</span> <span className="text-slate-400">- {s.desc}</span></span>
                                                 </div>
                                             ))}
                                         </div>
+                                    ) : (
+                                        <p className="text-sm text-slate-600">{activeItem.desc}</p>
                                     )}
-                                </div>
-                                
-                                {/* Footer */}
-                                <div className="p-4 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 text-center">
-                                    保留最近 {MAX_HISTORY} 個版本 · 目前有 {getHistory().length} 個版本
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    
-                    {/* Picking Banner */}
-                        {/* Header */}
-                        <div className="p-4 border-b border-slate-100 bg-white sticky top-0 z-10">
-                            <div className="flex justify-between items-center mb-2">
-                                <h1 className="text-lg font-bold flex items-center gap-2"><span>🌍</span> {itinerary[0].title}</h1>
-                                <div className="flex items-center gap-2">
-                                    <div className="relative">
-                                        <button onClick={() => setShowMenu(!showMenu)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
-                                            <Icons.Menu />
-                                        </button>
-                                        {showMenu && (
-                                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50">
-                                                <button onClick={() => { generateShareLink(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-blue-50 flex items-center gap-2">
-                                                    <Icons.Link /> 產生分享連結
-                                                </button>
-                                                <button onClick={() => { exportHTML(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-green-50 flex items-center gap-2">
-                                                    <Icons.Download /> 匯出 HTML
-                                                </button>
-                                                <button onClick={() => { exportJSON(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-green-50 flex items-center gap-2">
-                                                    <Icons.Download /> 匯出 JSON
-                                                </button>
-                                                <button onClick={() => { importJSON(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-purple-50 flex items-center gap-2">
-                                                    <Icons.Upload /> 匯入 JSON
-                                                </button>
-                                                <hr className="my-1 border-slate-200" />
-                                                <button onClick={() => { setShowHistory(true); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-blue-50 flex items-center gap-2">
-                                                    <Icons.History /> 版本歷史
-                                                </button>
-                                                <button onClick={() => { resetToOriginal(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-red-50 text-red-600 flex items-center gap-2">
-                                                    <Icons.RefreshCw /> 重置為原始
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button onClick={() => { setIsEditing(!isEditing); setPickingTarget(null); }} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition ${isEditing ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                                        {isEditing ? <><Icons.Save /> 完成</> : <><Icons.Edit /> 編輯</>}
-                                    </button>
-                                </div>
-                            </div>
-                            {isEditing ? (
-                                <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-100">💡 點擊「📍」再點地圖可設定座標。點擊「+ 新增景點」可添加多個地點。編輯會自動儲存。</div>
-                            ) : (
-                                <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-100 flex gap-2 items-center">
-                                    <Icons.Eye />
-                                    <span>目前為預覽模式。點擊下方列表可飛往該地點。</span>
                                 </div>
                             )}
                         </div>
-
-                        {/* List */}
-                        <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-3 bg-slate-50">
-                            {itinerary.map((item) => {
-                                if (item.id === 0) return (
-                                    <div key={item.id} className="p-4 mb-2 bg-gradient-to-r from-slate-800 to-slate-700 text-white rounded-xl shadow-lg">
-                                        <h3 className="font-bold text-lg mb-1">{item.title}</h3>
-                                        <p className="text-xs text-slate-200 opacity-90">{item.desc}</p>
-                                    </div>
-                                );
-                                const isActive = activeId === item.id;
-                                const isTurkey = item.city.includes('Turkey') || item.city.includes('Istanbul');
-                                const badgeColor = isTurkey ? 'bg-orange-100 text-orange-700' : (item.city.includes('TPE') ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700');
-
-                                return (
-                                    <div key={item.id} onClick={() => !isEditing && !pickingTarget && setActiveId(item.id)} className={`rounded-xl p-4 border transition-all duration-200 bg-white relative cursor-pointer ${isActive && !isEditing ? 'border-blue-500 shadow-md ring-1 ring-blue-100 transform scale-[1.02]' : 'border-slate-200 hover:border-blue-300 shadow-sm hover:shadow-md'}`}>
-                                        <div className="flex items-start gap-3">
-                                            <div className={`flex flex-col items-center justify-center w-12 h-12 rounded-lg shrink-0 ${badgeColor}`}>
-                                                <span className="text-[10px] font-bold uppercase">{item.day.split(' ')[0]}</span>
-                                                <span className="text-sm font-bold">{item.day.split(' ')[1]}</span>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                {isEditing ? (
-                                                    <div className="space-y-3">
-                                                        <div className="flex gap-2">
-                                                            <input className="w-1/3 text-xs border border-slate-300 rounded px-2 py-1" value={item.date} onChange={(e) => handleDayChange(item.id, 'date', e.target.value)} />
-                                                            <input className="w-2/3 text-xs border border-slate-300 rounded px-2 py-1 font-bold" value={item.title} onChange={(e) => handleDayChange(item.id, 'title', e.target.value)} />
-                                                        </div>
-                                                        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
-                                                            <span className="text-[10px] font-bold text-slate-500">中心:</span>
-                                                            <span className="text-[10px] font-mono text-slate-600 truncate">{item.coords[0]}, {item.coords[1]}</span>
-                                                            <button onClick={(e) => { e.stopPropagation(); startPicking(item.id, null); }} className="ml-auto flex items-center gap-1 text-[10px] bg-white border border-slate-300 px-2 py-1 rounded hover:text-blue-600"><Icons.Target /> 定位</button>
-                                                        </div>
-                                                        <div className="space-y-2 pl-2 border-l-2 border-slate-200">
-                                                            {item.spots && item.spots.map((spot, sIdx) => (
-                                                                <div key={sIdx} className="bg-slate-50 p-2 rounded border border-slate-200 relative">
-                                                                    <div className="flex gap-2 mb-1">
-                                                                        <input className="w-1/2 text-xs border border-slate-300 rounded px-1 py-0.5 font-bold" placeholder="景點" value={spot.name} onChange={(e) => handleSpotChange(item.id, sIdx, 'name', e.target.value)} />
-                                                                        <input className="w-1/2 text-xs border border-slate-300 rounded px-1 py-0.5" placeholder="描述" value={spot.desc} onChange={(e) => handleSpotChange(item.id, sIdx, 'desc', e.target.value)} />
-                                                                    </div>
-                                                                    <div className="flex items-center justify-between">
-                                                                        <span className="text-[10px] text-slate-400 font-mono">{spot.coords ? `${spot.coords[0]}, ...` : '-'}</span>
-                                                                        <div className="flex gap-1">
-                                                                            <button onClick={(e) => { e.stopPropagation(); moveSpot(item.id, sIdx, 'up'); }} disabled={sIdx === 0} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed" title="上移"><Icons.ChevronUp /></button>
-                                                                            <button onClick={(e) => { e.stopPropagation(); moveSpot(item.id, sIdx, 'down'); }} disabled={sIdx === item.spots.length - 1} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed" title="下移"><Icons.ChevronDown /></button>
-                                                                            <button onClick={(e) => { e.stopPropagation(); setSearchingSpot({ dayId: item.id, spotIndex: sIdx, query: spot.name }); }} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-green-600" title="搜尋"><Icons.Search /></button>
-                                                                            <button onClick={(e) => { e.stopPropagation(); startPicking(item.id, sIdx); }} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-blue-600" title="地圖點選">📍</button>
-                                                                            <button onClick={() => removeSpot(item.id, sIdx)} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-red-600"><Icons.Trash /></button>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                            <button onClick={() => addSpot(item.id)} className="w-full py-1 text-xs text-slate-500 border border-dashed border-slate-300 rounded hover:bg-slate-100 hover:text-blue-600">+ 新增景點</button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <h3 className={`font-bold text-sm ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{item.title}</h3>
-                                                        <div className="flex items-center gap-1 text-xs text-slate-500 mb-1"><Icons.MapPin /> {item.city}</div>
-                                                        <p className="text-xs text-slate-600 leading-relaxed mb-2">{item.desc}</p>
-                                                        {item.spots && item.spots.length > 0 && (
-                                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                                {item.spots.map((spot, idx) => (
-                                                                    <span 
-                                                                        key={idx} 
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setActiveId(item.id);
-                                                                            // 使用 mapRef 飛到景點
-                                                                            if (mapRef.current && spot.coords) {
-                                                                                mapRef.current.flyToSpot(spot.coords, 17);
-                                                                            }
-                                                                        }}
-                                                                        className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 hover:bg-blue-100 hover:border-blue-400 hover:text-blue-700 cursor-pointer transition-all"
-                                                                        title={`點擊飛到 ${spot.name}`}
-                                                                    >
-                                                                        📍 {spot.name}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
                     </div>
-                    
-                    {/* Desktop Map Area */}
-                    <div className="flex-1 relative h-full bg-slate-200">
-                        <MapComponent activeId={activeId} data={itinerary} onMarkerClick={setActiveId} pickingMode={!!pickingTarget} onPickLocation={handlePickLocation} mapRef={mapRef} />
-
-                        {activeItem && activeItem.id !== 0 && !isEditing && !pickingTarget && (
-                            <div className="absolute bottom-6 right-6 w-80 bg-white/95 backdrop-blur rounded-xl shadow-2xl p-4 z-[1000] border border-slate-200">
-                                <h2 className="font-bold text-lg text-slate-800 mb-1">{activeItem.title}</h2>
-                                {activeItem.spots && activeItem.spots.length > 0 ? (
-                                    <div className="space-y-1">
-                                        {activeItem.spots.map((s, i) => (
-                                            <div key={i} className="text-xs text-slate-600 flex gap-2">
-                                                <span className="font-bold text-blue-600">·</span> 
-                                                <span><span className="font-semibold">{s.name}</span> <span className="text-slate-400">- {s.desc}</span></span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-slate-600">{activeItem.desc}</p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    </div>
-                    {/* End Desktop View */}
                 </div>
             );
         };
