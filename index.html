@@ -379,12 +379,31 @@
                             const map = mapInstanceRef.current;
                             if (map && coords) {
                                 console.log('flyToSpot called:', coords, zoom);
-                                // 先縮小再放大，強制移動
+                                
+                                // 計算當前中心與目標的距離
+                                const center = map.getCenter();
+                                const distance = map.distance(center, coords);
                                 const currentZoom = map.getZoom();
-                                map.setView(coords, Math.max(currentZoom - 2, 8), { animate: false });
-                                setTimeout(() => {
-                                    map.flyTo(coords, zoom, { animate: true, duration: 0.8 });
-                                }, 50);
+                                
+                                console.log('Distance to target:', distance, 'm');
+                                
+                                // 根據距離選擇不同的移動方式
+                                if (distance < 500) {
+                                    // 很近（500m內）：平滑移動到中心
+                                    map.panTo(coords, { animate: true, duration: 0.5 });
+                                    if (currentZoom < zoom) {
+                                        setTimeout(() => map.setZoom(zoom, { animate: true }), 300);
+                                    }
+                                } else if (distance < 5000) {
+                                    // 中等距離（5km內）：平滑飛行
+                                    map.flyTo(coords, zoom, { animate: true, duration: 1 });
+                                } else {
+                                    // 較遠：先縮小再放大
+                                    map.setView(coords, Math.max(currentZoom - 3, 6), { animate: false });
+                                    setTimeout(() => {
+                                        map.flyTo(coords, zoom, { animate: true, duration: 1 });
+                                    }, 50);
+                                }
                             }
                         }
                     };
@@ -611,28 +630,38 @@
                                     className: 'custom-tooltip'
                                 });
                                 
-                                // 點擊事件 - 強制置中並加入視覺反饋
+                                // 點擊事件 - 智能移動
                                 m.on('click', function(e) {
                                     console.log(`Marker clicked: ${title}`, coords, 'isSpot:', isSpot);
                                     
-                                    // 先縮小再放大，強制移動到中心
+                                    // 計算距離
+                                    const center = map.getCenter();
+                                    const distance = map.distance(center, coords);
                                     const currentZoom = map.getZoom();
                                     const targetZoom = isSpot ? 17 : (item.zoom || 14);
                                     
-                                    // 用 panTo + setZoom 組合，更可靠
-                                    map.setView(coords, Math.max(currentZoom - 2, 8), { animate: false });
+                                    console.log('Distance to target:', distance, 'm');
                                     
-                                    setTimeout(() => {
-                                        map.flyTo(coords, targetZoom, {
-                                            animate: true,
-                                            duration: 0.8
-                                        });
-                                    }, 50);
-                                    
-                                    // 顯示 popup
-                                    setTimeout(() => {
-                                        m.openPopup();
-                                    }, 900);
+                                    // 根據距離選擇不同的移動方式
+                                    if (distance < 500) {
+                                        // 很近：平滑移動到中心
+                                        map.panTo(coords, { animate: true, duration: 0.5 });
+                                        if (currentZoom < targetZoom) {
+                                            setTimeout(() => map.setZoom(targetZoom, { animate: true }), 300);
+                                        }
+                                        setTimeout(() => m.openPopup(), 600);
+                                    } else if (distance < 5000) {
+                                        // 中等距離：平滑飛行
+                                        map.flyTo(coords, targetZoom, { animate: true, duration: 1 });
+                                        setTimeout(() => m.openPopup(), 1100);
+                                    } else {
+                                        // 較遠：先縮小再放大
+                                        map.setView(coords, Math.max(currentZoom - 3, 6), { animate: false });
+                                        setTimeout(() => {
+                                            map.flyTo(coords, targetZoom, { animate: true, duration: 1 });
+                                        }, 50);
+                                        setTimeout(() => m.openPopup(), 1200);
+                                    }
                                     
                                     // 通知父組件
                                     onMarkerClick(item.id);
