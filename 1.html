@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2026 土希雙國・詳細旅程表</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Leaflet Polyline Decorator for arrows -->
+    <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f8fafc;
+            overflow: hidden;
+        }
+        
+        #root { height: 100%; width: 100%; }
+
+        .custom-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .map-container { height: 100%; width: 100%; z-index: 10; }
+        
+        .cursor-crosshair { cursor: crosshair !important; }
+        
+        /* Custom Marker Styles */
+        .custom-div-icon, .custom-spot-icon {
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+        
+        /* Animation for the path */
+        .leaflet-interactive {
+            stroke-dasharray: 10, 10;
+            animation: dash 30s linear infinite;
+        }
+        
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -1000;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Internal Icons (No external dependency) ---
+        const Icons = {
+            MapPin: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+            Plane: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12h20"/><path d="M13 2v20"/><path d="M2 12l5-5"/><path d="M2 12l5 5"/><path d="M22 12l-5-5"/><path d="M22 12l-5 5"/></svg>, 
+            Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>,
+            Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+            Menu: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+            Crosshair: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>,
+            Target: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>,
+            Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+            Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+            Link: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+            RefreshCw: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+            Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
+            History: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>,
+            Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+            User: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        };
+
+        // --- Data: 2026/02/01 - 02/16 ---
+        const initialData = [
+            {
+                id: 0,
+                day: "Overview",
+                date: "2026/02/01 - 02/16",
+                city: "Turkey & Greece",
+                title: "2026 土希雙國 16 天之旅",
+                desc: "歡迎來到您的動態行程地圖！點擊左側列表的任何一天，地圖將會自動飛往該地點。開啟右上角的「編輯模式」可以修改行程或新增景點。",
+                coords: [38.5, 26.0], 
+                zoom: 6,
+                color: "bg-slate-800",
+                spots: []
+            },
+            {
+                id: 1,
+                day: "Day 1",
+                date: "2/01 (日)",
+                city: "TPE -> 機上",
+                title: "啟程：飛往伊斯坦堡",
+                desc: "晚上 8 點抵達桃園機場 (TPE)。搭乘土耳其航空 TK25 (22:10) 直飛伊斯坦堡。",
+                coords: [25.0797, 121.2342],
+                zoom: 12,
+                color: "bg-slate-500",
+                spots: [
+                    { name: "桃園國際機場", coords: [25.0797, 121.2342], desc: "TK25 航班報到" }
+                ]
+            },
+            {
+                id: 2,
+                day: "Day 2",
+                date: "2/02 (一)",
+                city: "Istanbul",
+                title: "伊斯坦堡：舊城區",
+                desc: "05:50 抵達 IST。市區觀光：聖索菲亞大教堂、舊城區漫遊。",
+                coords: [41.0082, 28.9784],
+                zoom: 15,
+                color: "bg-orange-600",
+                spots: [
+                    { name: "IST 機場", coords: [41.2768, 28.7293], desc: "清晨抵達" },
+                    { name: "聖索菲亞大教堂", coords: [41.0086, 28.9802], desc: "Hagia Sophia" },
+                    { name: "地下水宮殿", coords: [41.0084, 28.9779], desc: "Basilica Cistern" }
+                ]
+            },
+            {
+                id: 3,
+                day: "Day 3",
+                date: "2/03 (二)",
+                city: "Istanbul",
+                title: "伊斯坦堡：純真博物館",
+                desc: "參觀純真博物館，漫步貝尤魯區 (Beyoğlu)。",
+                coords: [41.0312, 28.9783],
+                zoom: 15,
+                color: "bg-orange-600",
+                spots: [
+                    { name: "純真博物館", coords: [41.0312, 28.9783], desc: "Museum of Innocence" },
+                    { name: "獨立大道", coords: [41.0340, 28.9780], desc: "Istiklal Avenue" }
+                ]
+            },
+            {
+                id: 4,
+                day: "Day 4",
+                date: "2/04 (三)",
+                city: "Istanbul -> Santorini",
+                title: "大移動日：前進聖托里尼",
+                desc: "09:30 到 IST -> 12:30 到 ATH -> 17:00 轉廉航 -> 18:00 到 JTR (聖托里尼)。",
+                coords: [36.3932, 25.4615],
+                zoom: 11,
+                color: "bg-cyan-600",
+                spots: [
+                    { name: "IST 機場", coords: [41.2768, 28.7293], desc: "TK1847 飛往雅典" },
+                    { name: "ATH 機場", coords: [37.9364, 23.9445], desc: "轉機等待" },
+                    { name: "JTR 機場", coords: [36.3996, 25.4793], desc: "抵達聖托里尼" }
+                ]
+            },
+            {
+                id: 5,
+                day: "Day 5",
+                date: "2/05 (四)",
+                city: "Santorini",
+                title: "聖托里尼全日",
+                desc: "Fira, Oia 漫遊，欣賞藍頂白屋與愛琴海日落。",
+                coords: [36.4618, 25.3753],
+                zoom: 13,
+                color: "bg-cyan-600",
+                spots: [
+                    { name: "Oia", coords: [36.4618, 25.3753], desc: "日落觀景點" },
+                    { name: "Fira", coords: [36.4166, 25.4324], desc: "市中心逛街" }
+                ]
+            },
+            {
+                id: 6,
+                day: "Day 6",
+                date: "2/06 (五)",
+                city: "Santorini -> Steiri",
+                title: "飛回雅典 & 租車啟程",
+                desc: "10:00 退房 -> 13:00 ATH 機場取車 -> 開車前往 Steiri (日落前抵達 Airbnb)。",
+                coords: [38.4024, 22.7093], 
+                zoom: 9,
+                color: "bg-blue-600",
+                spots: [
+                    { name: "JTR 機場", coords: [36.3996, 25.4793], desc: "飛往雅典" },
+                    { name: "ATH 機場租車", coords: [37.9364, 23.9445], desc: "Hertz/Sixt 取車" },
+                    { name: "Steiri", coords: [38.4024, 22.7093], desc: "夜宿 Airbnb (近修道院)" }
+                ]
+            },
+            {
+                id: 7,
+                day: "Day 7",
+                date: "2/07 (六)",
+                city: "Delphi -> Athens",
+                title: "德爾菲神諭 & 返回雅典",
+                desc: "參觀 Delphi 遺跡、Arachova 山城。日落前開車回雅典 Check-in。",
+                coords: [38.4801, 22.5012],
+                zoom: 10,
+                color: "bg-blue-600",
+                spots: [
+                    { name: "Delphi", coords: [38.4801, 22.5012], desc: "阿波羅神殿遺跡" },
+                    { name: "Arachova", coords: [38.4800, 22.5866], desc: "羊絨製品、午餐" },
+                    { name: "雅典 Airbnb", coords: [37.9838, 23.7275], desc: "市區停車入住" }
+                ]
+            },
+            {
+                id: 8,
+                day: "Day 8",
+                date: "2/08 (日)",
+                city: "Peloponnese",
+                title: "伯羅奔尼撒半島一日遊",
+                desc: "早起出發 -> 科林斯運河 -> 邁錫尼 -> 傍晚抵達納夫普利翁。",
+                coords: [37.5670, 22.8050],
+                zoom: 9,
+                color: "bg-indigo-600",
+                spots: [
+                    { name: "科林斯運河", coords: [37.9345, 22.9838], desc: "Corinth Canal" },
+                    { name: "邁錫尼", coords: [37.7308, 22.7561], desc: "Mycenae 獅子門" },
+                    { name: "納夫普利翁", coords: [37.5670, 22.8050], desc: "Nafplio 住宿" }
+                ]
+            },
+            {
+                id: 9,
+                day: "Day 9",
+                date: "2/09 (一)",
+                city: "Nafplion Area",
+                title: "納夫普利翁與周邊",
+                desc: "探索 Nafplio 舊城、Palamidi 城堡，或周邊景點。",
+                coords: [37.5670, 22.8050],
+                zoom: 14,
+                color: "bg-indigo-600",
+                spots: [
+                    { name: "Palamidi 城堡", coords: [37.5631, 22.8037], desc: "登高望海" },
+                    { name: "Bourtzi 城堡", coords: [37.5707, 22.7937], desc: "海上城堡" }
+                ]
+            },
+            {
+                id: 10,
+                day: "Day 10",
+                date: "2/10 (二)",
+                city: "Nafplion -> Athens",
+                title: "返回雅典 (仍租車)",
+                desc: "開車返回雅典。可能還車或保留車輛去近郊。",
+                coords: [37.9838, 23.7275],
+                zoom: 10,
+                color: "bg-blue-600",
+                spots: [
+                    { name: "雅典", coords: [37.9838, 23.7275], desc: "返回市區" }
+                ]
+            },
+            {
+                id: 11,
+                day: "Day 11",
+                date: "2/11 (三)",
+                city: "Athens",
+                title: "雅典慢慢行 (1)",
+                desc: "市區景點：衛城 (Acropolis)、衛城博物館。",
+                coords: [37.9715, 23.7257],
+                zoom: 15,
+                color: "bg-blue-600",
+                spots: [
+                    { name: "衛城", coords: [37.9715, 23.7257], desc: "Acropolis" },
+                    { name: "衛城博物館", coords: [37.9684, 23.7285], desc: "Acropolis Museum" }
+                ]
+            },
+            {
+                id: 12,
+                day: "Day 12",
+                date: "2/12 (四)",
+                city: "Athens",
+                title: "雅典慢慢行 (2)",
+                desc: "市區漫遊，普拉卡區 (Plaka)、憲法廣場。",
+                coords: [37.9755, 23.7364],
+                zoom: 15,
+                color: "bg-blue-600",
+                spots: [
+                    { name: "憲法廣場", coords: [37.9755, 23.7364], desc: "衛兵交接" },
+                    { name: "普拉卡區", coords: [37.9734, 23.7298], desc: "Plaka" }
+                ]
+            },
+            {
+                id: 13,
+                day: "Day 13",
+                date: "2/13 (五)",
+                city: "Athens",
+                title: "雅典慢慢行 (3)",
+                desc: "國立考古博物館、利卡維多斯山 (Lycabettus Hill) 夕陽。",
+                coords: [37.9891, 23.7326],
+                zoom: 15,
+                color: "bg-blue-600",
+                spots: [
+                    { name: "國立考古博物館", coords: [37.9891, 23.7326], desc: "National Archaeological Museum" },
+                    { name: "利卡維多斯山", coords: [37.9819, 23.7431], desc: "Lycabettus Hill" }
+                ]
+            },
+            {
+                id: 14,
+                day: "Day 14",
+                date: "2/14 (六)",
+                city: "Athens",
+                title: "雅典慢慢行 (4)",
+                desc: "最後市區巡禮，採買伴手禮。Monastiraki 跳蚤市場。",
+                coords: [37.9760, 23.7250],
+                zoom: 15,
+                color: "bg-blue-600",
+                spots: [
+                    { name: "Monastiraki", coords: [37.9760, 23.7250], desc: "跳蚤市場" }
+                ]
+            },
+            {
+                id: 15,
+                day: "Day 15",
+                date: "2/15 (日)",
+                city: "Athens -> TPE",
+                title: "告別希臘",
+                desc: "11:00 抵達 ATH 機場，搭機返台。",
+                coords: [37.9364, 23.9445],
+                zoom: 12,
+                color: "bg-slate-500",
+                spots: [
+                    { name: "ATH 機場", coords: [37.9364, 23.9445], desc: "辦理登機" }
+                ]
+            },
+            {
+                id: 16,
+                day: "Day 16",
+                date: "2/16 (一)",
+                city: "Taipei",
+                title: "抵達台灣",
+                desc: "08:45 抵達桃園國際機場 (TPE)。",
+                coords: [25.0797, 121.2342],
+                zoom: 12,
+                color: "bg-slate-500",
+                spots: []
+            }
+        ];
+
+        // --- Map Component ---
+        const MapComponent = ({ activeId, data, onMarkerClick, pickingMode, onPickLocation }) => {
+            const mapContainerRef = useRef(null);
+            const mapInstanceRef = useRef(null);
+            const markersRef = useRef({});
+            const polylineRef = useRef(null);
+            const decoratorRef = useRef(null);
+            
+            // 1. Initialize Map
+            useEffect(() => {
+                if (!mapContainerRef.current) return;
+                if (mapInstanceRef.current) return; // Prevent double init
+
+                try {
+                    const map = L.map(mapContainerRef.current, {
+                        zoomControl: false,
+                        attributionControl: false
+                    }).setView([38.5, 26.0], 5);
+
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap',
+                        maxZoom: 19
+                    }).addTo(map);
+
+                    L.control.zoom({ position: 'topright' }).addTo(map);
+                    mapInstanceRef.current = map;
+                } catch (e) {
+                    console.error("Map Init Error:", e);
+                }
+
+                // Cleanup
+                return () => {
+                    if (mapInstanceRef.current) {
+                        mapInstanceRef.current.remove();
+                        mapInstanceRef.current = null;
+                    }
+                };
+            }, []);
+
+            // 2. Handle Picking Mode
+            useEffect(() => {
+                const map = mapInstanceRef.current;
+                const container = mapContainerRef.current;
+                if (!map || !container) return;
+
+                if (pickingMode) {
+                    container.classList.add('cursor-crosshair');
+                    const onClick = (e) => onPickLocation([e.latlng.lat, e.latlng.lng]);
+                    map.on('click', onClick);
+                    return () => {
+                        map.off('click', onClick);
+                        container.classList.remove('cursor-crosshair');
+                    };
+                } else {
+                    container.classList.remove('cursor-crosshair');
+                }
+            }, [pickingMode, onPickLocation]);
+
+            // 3. Draw Markers & Lines
+            useEffect(() => {
+                const map = mapInstanceRef.current;
+                if (!map) return;
+
+                // Clear old layers
+                if (polylineRef.current) polylineRef.current.remove();
+                if (decoratorRef.current) decoratorRef.current.remove();
+                Object.values(markersRef.current).forEach(m => m.remove());
+                markersRef.current = {};
+
+                // Draw Line
+                const routePoints = data
+                    .filter(item => item.id !== 0 && item.coords && item.coords[0] !== 0)
+                    .map(item => item.coords);
+
+                if (routePoints.length > 0) {
+                    polylineRef.current = L.polyline(routePoints, {
+                        color: '#6366f1', weight: 3, opacity: 0.6, dashArray: '10, 10', lineCap: 'round', className: 'animate-dash'
+                    }).addTo(map);
+                    
+                    // Add arrow decorators
+                    decoratorRef.current = L.polylineDecorator(polylineRef.current, {
+                        patterns: [
+                            {
+                                offset: '5%',
+                                repeat: 80,
+                                symbol: L.Symbol.arrowHead({
+                                    pixelSize: 10,
+                                    polygon: false,
+                                    pathOptions: {
+                                        stroke: true,
+                                        weight: 2,
+                                        color: '#6366f1',
+                                        opacity: 0.7
+                                    }
+                                })
+                            }
+                        ]
+                    }).addTo(map);
+                }
+
+                // Draw Markers
+                data.forEach(item => {
+                    if (item.id === 0) return;
+
+                    const createMarker = (coords, color, title, isSpot = false) => {
+                        if (!coords || coords[0] === 0) return;
+                        const size = isSpot ? 10 : 14;
+                        const anchor = isSpot ? 5 : 7;
+                        
+                        let hexColor = '#64748b';
+                        if(color.includes('orange')) hexColor = '#f97316';
+                        if(color.includes('blue')) hexColor = '#3b82f6';
+                        if(color.includes('cyan')) hexColor = '#06b6d4';
+                        if(color.includes('indigo')) hexColor = '#6366f1';
+                        if(isSpot) hexColor = '#ef4444';
+
+                        const icon = L.divIcon({
+                            className: isSpot ? 'custom-spot-icon' : 'custom-div-icon',
+                            html: `<div style="background-color: ${hexColor}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${isSpot ? 1 : 2}px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
+                            iconSize: [size, size],
+                            iconAnchor: [anchor, anchor]
+                        });
+
+                        const m = L.marker(coords, { icon }).addTo(map);
+                        m.bindPopup(`<b>${title}</b>`);
+                        m.on('click', () => onMarkerClick(item.id));
+                        return m;
+                    };
+
+                    // Draw spots or main marker
+                    if (item.spots && item.spots.length > 0) {
+                        item.spots.forEach((spot, idx) => {
+                            const m = createMarker(spot.coords, item.color, spot.name, true);
+                            if(m) markersRef.current[`spot-${item.id}-${idx}`] = m;
+                        });
+                    } else {
+                        const m = createMarker(item.coords, item.color, item.title, false);
+                        if(m) markersRef.current[`day-${item.id}`] = m;
+                    }
+                });
+            }, [data]);
+
+            // 4. FlyTo Active
+            useEffect(() => {
+                const map = mapInstanceRef.current;
+                if (!map) return;
+                
+                const target = data.find(d => d.id === activeId);
+                if (target && target.coords && target.coords[0] !== 0) {
+                    map.flyTo(target.coords, target.zoom || 12, { animate: true, duration: 1.2 });
+                }
+            }, [activeId]);
+
+            return <div ref={mapContainerRef} className="map-container bg-slate-100"></div>;
+        };
+
+        // --- Main App ---
+        const App = () => {
+            const STORAGE_KEY = 'travel-itinerary-data';
+            const HISTORY_KEY = 'travel-itinerary-history';
+            const MAX_HISTORY = 20; // 保留最近 20 個版本
+            
+            // Load from localStorage or URL hash or initialData
+            const loadInitialData = () => {
+                // 1. Check URL hash first (for sharing)
+                const hash = window.location.hash.substring(1);
+                if (hash) {
+                    try {
+                        const decoded = decodeURIComponent(hash);
+                        const parsed = JSON.parse(decoded);
+                        if (parsed && Array.isArray(parsed)) {
+                            return parsed;
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse URL hash:', e);
+                    }
+                }
+                
+                // 2. Check localStorage
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    try {
+                        const parsed = JSON.parse(stored);
+                        if (parsed && Array.isArray(parsed)) {
+                            return parsed;
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse localStorage:', e);
+                    }
+                }
+                
+                // 3. Use initialData
+                return initialData;
+            };
+            
+            const [itinerary, setItinerary] = useState(loadInitialData);
+            const [activeId, setActiveId] = useState(0);
+            const [isEditing, setIsEditing] = useState(false);
+            const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+            const [pickingTarget, setPickingTarget] = useState(null);
+            const [showMenu, setShowMenu] = useState(false);
+            const [showHistory, setShowHistory] = useState(false);
+            const [editorName, setEditorName] = useState(localStorage.getItem('editor-name') || '');
+
+            const activeItem = itinerary.find(d => d.id === activeId);
+            
+            // Version History Functions
+            const saveVersion = (data, action = '編輯') => {
+                const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+                const version = {
+                    id: Date.now(),
+                    timestamp: new Date().toISOString(),
+                    editor: editorName || '未命名',
+                    action: action,
+                    data: data
+                };
+                
+                // 加入新版本到歷史記錄
+                history.unshift(version);
+                
+                // 只保留最近 N 個版本
+                if (history.length > MAX_HISTORY) {
+                    history.splice(MAX_HISTORY);
+                }
+                
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+            };
+            
+            const getHistory = () => {
+                return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+            };
+            
+            const restoreVersion = (versionId) => {
+                const history = getHistory();
+                const version = history.find(v => v.id === versionId);
+                if (version) {
+                    setItinerary(version.data);
+                    saveVersion(version.data, '恢復版本');
+                    setShowHistory(false);
+                    alert('✅ 版本已恢復！');
+                }
+            };
+            
+            // Auto-save to localStorage when itinerary changes
+            useEffect(() => {
+                if (itinerary.length > 0) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(itinerary));
+                    // 如果是編輯模式，自動保存版本（節流：每 30 秒最多一次）
+                    if (isEditing) {
+                        const lastSave = localStorage.getItem('last-auto-save');
+                        const now = Date.now();
+                        if (!lastSave || now - parseInt(lastSave) > 30000) {
+                            saveVersion(itinerary, '自動儲存');
+                            localStorage.setItem('last-auto-save', now.toString());
+                        }
+                    }
+                }
+            }, [itinerary, isEditing]);
+
+            // Handlers
+            const handleDayChange = (id, field, value) => {
+                setItinerary(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+            };
+            const handleSpotChange = (dayId, spotIndex, field, value) => {
+                setItinerary(prev => prev.map(item => {
+                    if (item.id === dayId) {
+                        const newSpots = [...item.spots];
+                        newSpots[spotIndex] = { ...newSpots[spotIndex], [field]: value };
+                        return { ...item, spots: newSpots };
+                    }
+                    return item;
+                }));
+            };
+            const addSpot = (dayId) => {
+                setItinerary(prev => prev.map(item => {
+                    if (item.id === dayId) {
+                        return { ...item, spots: [...(item.spots || []), { name: "新景點", desc: "", coords: [...item.coords] }] };
+                    }
+                    return item;
+                }));
+            };
+            const removeSpot = (dayId, spotIndex) => {
+                setItinerary(prev => prev.map(item => {
+                    if (item.id === dayId) {
+                        const newSpots = item.spots.filter((_, idx) => idx !== spotIndex);
+                        return { ...item, spots: newSpots };
+                    }
+                    return item;
+                }));
+            };
+            const startPicking = (dayId, spotIndex = null) => {
+                setPickingTarget({ dayId, spotIndex });
+                if(window.innerWidth < 768) setIsSidebarOpen(false);
+            };
+            const handlePickLocation = (coords) => {
+                if (!pickingTarget) return;
+                const { dayId, spotIndex } = pickingTarget;
+                const rounded = [parseFloat(coords[0].toFixed(4)), parseFloat(coords[1].toFixed(4))];
+                setItinerary(prev => prev.map(item => {
+                    if (item.id === dayId) {
+                        if (spotIndex === null) return { ...item, coords: rounded };
+                        const newSpots = [...item.spots];
+                        newSpots[spotIndex] = { ...newSpots[spotIndex], coords: rounded };
+                        return { ...item, spots: newSpots };
+                    }
+                    return item;
+                }));
+                setPickingTarget(null);
+                if(window.innerWidth < 768) setIsSidebarOpen(true);
+            };
+            
+            // Export/Import/Share functions
+            const exportHTML = () => {
+                // 直接使用 Python 腳本方案提示
+                alert(
+                    '📤 匯出完整 HTML\n\n' +
+                    '由於瀏覽器限制，建議使用以下方式：\n\n' +
+                    '方式 1️⃣ 【推薦】匯出 JSON\n' +
+                    '→ 點選「匯出 JSON」\n' +
+                    '→ 使用 export-with-data.py 產生 HTML\n' +
+                    '→ 或直接傳 JSON 給旅伴匯入\n\n' +
+                    '方式 2️⃣ 上傳到 GitHub Pages\n' +
+                    '→ 將 1.html 上傳到 GitHub\n' +
+                    '→ 啟用 GitHub Pages\n' +
+                    '→ 分享連結即可\n\n' +
+                    '方式 3️⃣ 手動修改\n' +
+                    '→ 匯出 JSON 後\n' +
+                    '→ 手動替換 1.html 中的 initialData'
+                );
+            };
+            
+            const exportJSON = () => {
+                // 詢問編輯者名稱（如果還沒設定）
+                let name = editorName;
+                if (!name) {
+                    name = prompt('請輸入您的名字（方便辨識誰編輯的）：', '');
+                    if (name) {
+                        setEditorName(name);
+                        localStorage.setItem('editor-name', name);
+                    }
+                }
+                
+                // 建立包含版本資訊的資料
+                const exportData = {
+                    version: Date.now(),
+                    timestamp: new Date().toISOString(),
+                    editor: name || '未命名',
+                    data: itinerary
+                };
+                
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json; charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${itinerary[0].title}_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                // 同時保存到版本歷史
+                saveVersion(itinerary, '匯出 JSON');
+                alert('✅ 匯出成功！\n\n此 JSON 檔案包含版本資訊，匯入時可以追蹤編輯者和時間。');
+            };
+            
+            const importJSON = () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const imported = JSON.parse(event.target.result);
+                            
+                            // 檢查是否為新版本格式（包含 version, editor 等資訊）
+                            let importedData, importInfo;
+                            if (imported.version && imported.data) {
+                                importedData = imported.data;
+                                importInfo = {
+                                    editor: imported.editor,
+                                    timestamp: imported.timestamp,
+                                    version: imported.version
+                                };
+                            } else if (Array.isArray(imported)) {
+                                // 舊版本格式（直接是陣列）
+                                importedData = imported;
+                                importInfo = null;
+                            } else {
+                                alert('❌ 檔案格式錯誤');
+                                return;
+                            }
+                            
+                            // 檢查版本衝突
+                            const currentVersion = localStorage.getItem('last-save-version');
+                            if (importInfo && currentVersion) {
+                                const importTime = new Date(importInfo.timestamp);
+                                const currentTime = new Date(parseInt(currentVersion));
+                                
+                                if (importTime < currentTime) {
+                                    const confirm = window.confirm(
+                                        `⚠️ 版本衝突警告\n\n` +
+                                        `匯入檔案：${importInfo.editor} 於 ${importTime.toLocaleString('zh-TW')} 編輯\n` +
+                                        `目前版本：較新的版本\n\n` +
+                                        `匯入會覆蓋目前的編輯，確定要繼續嗎？\n` +
+                                        `(建議：先匯出目前版本備份)`
+                                    );
+                                    if (!confirm) return;
+                                }
+                            }
+                            
+                            // 匯入前先保存目前版本
+                            saveVersion(itinerary, '匯入前備份');
+                            
+                            // 匯入新資料
+                            setItinerary(importedData);
+                            
+                            // 保存匯入版本
+                            const action = importInfo 
+                                ? `匯入 ${importInfo.editor} 的版本` 
+                                : '匯入 JSON';
+                            saveVersion(importedData, action);
+                            
+                            // 更新最後儲存版本號
+                            if (importInfo) {
+                                localStorage.setItem('last-save-version', importInfo.version.toString());
+                            }
+                            
+                            alert('✅ 匯入成功！\n\n已自動備份匯入前的版本，可從「版本歷史」查看。');
+                        } catch (e) {
+                            alert('❌ 無法解析 JSON 檔案\n\n' + e.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                };
+                input.click();
+            };
+            
+            const generateShareLink = () => {
+                const dataStr = JSON.stringify(itinerary);
+                const encoded = encodeURIComponent(dataStr);
+                
+                // 檢查是否為 file:// 協議
+                if (window.location.protocol === 'file:') {
+                    const fileName = window.location.pathname.split('/').pop() || '1.html';
+                    const shareLink = `${fileName}#${encoded}`;
+                    
+                    // 產生完整說明
+                    const message = `📋 分享說明：
+
+由於您是從本機開啟檔案，請選擇以下分享方式：
+
+方式 1️⃣【推薦】：匯出 HTML 檔案
+→ 點選「匯出 HTML」下載完整網頁
+→ 直接傳送給朋友開啟
+
+方式 2️⃣：複製相對連結（需先上傳到網路空間）
+→ 將 1.html 上傳到伺服器或 GitHub Pages
+→ 分享連結：${shareLink}
+
+方式 3️⃣：匯出 JSON 備份
+→ 點選「匯出 JSON」儲存資料
+→ 朋友匯入後即可查看
+
+相對連結已複製！`;
+                    
+                    navigator.clipboard.writeText(shareLink).then(() => {
+                        alert(message);
+                    }).catch(() => {
+                        alert(message + '\n\n請手動複製：' + shareLink);
+                    });
+                } else {
+                    // HTTP/HTTPS 協議可以正常分享
+                    const url = `${window.location.origin}${window.location.pathname}#${encoded}`;
+                    navigator.clipboard.writeText(url).then(() => {
+                        alert('🔗 分享連結已複製到剪貼簿！\n\n傳送給朋友即可分享您的行程。');
+                    }).catch(() => {
+                        prompt('請複製此連結分享：', url);
+                    });
+                }
+            };
+            
+            const resetToOriginal = () => {
+                if (confirm('確定要重置為原始行程嗎？所有修改將會遺失。')) {
+                    // 備份目前版本
+                    saveVersion(itinerary, '重置前備份');
+                    setItinerary(initialData);
+                    localStorage.removeItem(STORAGE_KEY);
+                    window.location.hash = '';
+                    alert('✅ 已重置為原始行程\n\n已自動備份重置前的版本，可從「版本歷史」恢復。');
+                }
+            };
+            
+            const formatDate = (isoString) => {
+                const date = new Date(isoString);
+                return date.toLocaleString('zh-TW', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            };
+
+            return (
+                <div className="flex flex-col md:flex-row h-full overflow-hidden relative text-slate-800">
+                    
+                    {/* Picking Banner */}
+                    {pickingTarget && (
+                        <div onClick={() => setPickingTarget(null)} className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[2000] bg-blue-600 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 cursor-pointer hover:bg-blue-700 transition animate-bounce">
+                            <Icons.Crosshair />
+                            <span className="font-bold">請點地圖選點 (取消)</span>
+                        </div>
+                    )}
+                    
+                    {/* Version History Modal */}
+                    {showHistory && (
+                        <div className="absolute inset-0 bg-black/50 z-[3000] flex items-center justify-center p-4" onClick={() => setShowHistory(false)}>
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                                {/* Header */}
+                                <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-blue-50 to-purple-50">
+                                    <div className="flex items-center gap-2">
+                                        <Icons.History />
+                                        <h2 className="font-bold text-lg">版本歷史</h2>
+                                    </div>
+                                    <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+                                </div>
+                                
+                                {/* Content */}
+                                <div className="flex-1 overflow-y-auto p-4 custom-scroll">
+                                    {getHistory().length === 0 ? (
+                                        <div className="text-center py-12 text-slate-400">
+                                            <Icons.History />
+                                            <p className="mt-2">尚無版本歷史記錄</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {getHistory().map((version, index) => (
+                                                <div key={version.id} className="border border-slate-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-md transition">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="font-bold text-sm text-blue-600">{version.action}</span>
+                                                                {index === 0 && (
+                                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">最新</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-3 text-xs text-slate-500">
+                                                                <span className="flex items-center gap-1">
+                                                                    <Icons.User />
+                                                                    {version.editor}
+                                                                </span>
+                                                                <span className="flex items-center gap-1">
+                                                                    <Icons.Clock />
+                                                                    {formatDate(version.timestamp)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => {
+                                                                if (confirm(`確定要恢復到此版本嗎？\n\n${version.action}\n編輯者：${version.editor}\n時間：${formatDate(version.timestamp)}\n\n目前版本將會被保存到歷史記錄。`)) {
+                                                                    restoreVersion(version.id);
+                                                                }
+                                                            }}
+                                                            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-bold whitespace-nowrap"
+                                                        >
+                                                            恢復
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Footer */}
+                                <div className="p-4 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 text-center">
+                                    保留最近 {MAX_HISTORY} 個版本 · 目前有 {getHistory().length} 個版本
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sidebar */}
+                    <div className={`w-full md:w-[480px] bg-white shadow-xl z-20 flex flex-col transition-all duration-300 absolute md:relative h-full border-r border-slate-200 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+                        {/* Header */}
+                        <div className="p-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+                            <div className="flex justify-between items-center mb-2">
+                                <h1 className="text-lg font-bold flex items-center gap-2"><span>🌍</span> {itinerary[0].title}</h1>
+                                <div className="flex items-center gap-2">
+                                    <div className="relative">
+                                        <button onClick={() => setShowMenu(!showMenu)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                                            <Icons.Menu />
+                                        </button>
+                                        {showMenu && (
+                                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50">
+                                                <button onClick={() => { generateShareLink(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-blue-50 flex items-center gap-2">
+                                                    <Icons.Link /> 產生分享連結
+                                                </button>
+                                                <button onClick={() => { exportHTML(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-green-50 flex items-center gap-2">
+                                                    <Icons.Download /> 匯出 HTML
+                                                </button>
+                                                <button onClick={() => { exportJSON(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-green-50 flex items-center gap-2">
+                                                    <Icons.Download /> 匯出 JSON
+                                                </button>
+                                                <button onClick={() => { importJSON(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-purple-50 flex items-center gap-2">
+                                                    <Icons.Upload /> 匯入 JSON
+                                                </button>
+                                                <hr className="my-1 border-slate-200" />
+                                                <button onClick={() => { setShowHistory(true); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-blue-50 flex items-center gap-2">
+                                                    <Icons.History /> 版本歷史
+                                                </button>
+                                                <button onClick={() => { resetToOriginal(); setShowMenu(false); }} className="w-full px-4 py-2 text-xs text-left hover:bg-red-50 text-red-600 flex items-center gap-2">
+                                                    <Icons.RefreshCw /> 重置為原始
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button onClick={() => { setIsEditing(!isEditing); setPickingTarget(null); }} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition ${isEditing ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                                        {isEditing ? <><Icons.Save /> 完成</> : <><Icons.Edit /> 編輯</>}
+                                    </button>
+                                </div>
+                            </div>
+                            {isEditing ? (
+                                <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-100">💡 點擊「📍」再點地圖可設定座標。點擊「+ 新增景點」可添加多個地點。編輯會自動儲存。</div>
+                            ) : (
+                                <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-100 flex gap-2 items-center">
+                                    <Icons.Eye />
+                                    <span>目前為預覽模式。點擊下方列表可飛往該地點。</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* List */}
+                        <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-3 bg-slate-50">
+                            {itinerary.map((item) => {
+                                if (item.id === 0) return (
+                                    <div key={item.id} className="p-4 mb-2 bg-gradient-to-r from-slate-800 to-slate-700 text-white rounded-xl shadow-lg">
+                                        <h3 className="font-bold text-lg mb-1">{item.title}</h3>
+                                        <p className="text-xs text-slate-200 opacity-90">{item.desc}</p>
+                                    </div>
+                                );
+                                const isActive = activeId === item.id;
+                                const isTurkey = item.city.includes('Turkey') || item.city.includes('Istanbul');
+                                const badgeColor = isTurkey ? 'bg-orange-100 text-orange-700' : (item.city.includes('TPE') ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700');
+
+                                return (
+                                    <div key={item.id} onClick={() => !isEditing && !pickingTarget && setActiveId(item.id)} className={`rounded-xl p-4 border transition-all duration-200 bg-white relative cursor-pointer ${isActive && !isEditing ? 'border-blue-500 shadow-md ring-1 ring-blue-100 transform scale-[1.02]' : 'border-slate-200 hover:border-blue-300 shadow-sm hover:shadow-md'}`}>
+                                        <div className="flex items-start gap-3">
+                                            <div className={`flex flex-col items-center justify-center w-12 h-12 rounded-lg shrink-0 ${badgeColor}`}>
+                                                <span className="text-[10px] font-bold uppercase">{item.day.split(' ')[0]}</span>
+                                                <span className="text-sm font-bold">{item.day.split(' ')[1]}</span>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                {isEditing ? (
+                                                    <div className="space-y-3">
+                                                        <div className="flex gap-2">
+                                                            <input className="w-1/3 text-xs border border-slate-300 rounded px-2 py-1" value={item.date} onChange={(e) => handleDayChange(item.id, 'date', e.target.value)} />
+                                                            <input className="w-2/3 text-xs border border-slate-300 rounded px-2 py-1 font-bold" value={item.title} onChange={(e) => handleDayChange(item.id, 'title', e.target.value)} />
+                                                        </div>
+                                                        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
+                                                            <span className="text-[10px] font-bold text-slate-500">中心:</span>
+                                                            <span className="text-[10px] font-mono text-slate-600 truncate">{item.coords[0]}, {item.coords[1]}</span>
+                                                            <button onClick={(e) => { e.stopPropagation(); startPicking(item.id, null); }} className="ml-auto flex items-center gap-1 text-[10px] bg-white border border-slate-300 px-2 py-1 rounded hover:text-blue-600"><Icons.Target /> 定位</button>
+                                                        </div>
+                                                        <div className="space-y-2 pl-2 border-l-2 border-slate-200">
+                                                            {item.spots && item.spots.map((spot, sIdx) => (
+                                                                <div key={sIdx} className="bg-slate-50 p-2 rounded border border-slate-200 relative">
+                                                                    <div className="flex gap-2 mb-1">
+                                                                        <input className="w-1/2 text-xs border border-slate-300 rounded px-1 py-0.5 font-bold" placeholder="景點" value={spot.name} onChange={(e) => handleSpotChange(item.id, sIdx, 'name', e.target.value)} />
+                                                                        <input className="w-1/2 text-xs border border-slate-300 rounded px-1 py-0.5" placeholder="描述" value={spot.desc} onChange={(e) => handleSpotChange(item.id, sIdx, 'desc', e.target.value)} />
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="text-[10px] text-slate-400 font-mono">{spot.coords ? `${spot.coords[0]}, ...` : '-'}</span>
+                                                                        <div className="flex gap-1">
+                                                                            <button onClick={(e) => { e.stopPropagation(); startPicking(item.id, sIdx); }} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-blue-600">📍</button>
+                                                                            <button onClick={() => removeSpot(item.id, sIdx)} className="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded hover:text-red-600"><Icons.Trash /></button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                            <button onClick={() => addSpot(item.id)} className="w-full py-1 text-xs text-slate-500 border border-dashed border-slate-300 rounded hover:bg-slate-100 hover:text-blue-600">+ 新增景點</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <h3 className={`font-bold text-sm ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{item.title}</h3>
+                                                        <div className="flex items-center gap-1 text-xs text-slate-500 mb-1"><Icons.MapPin /> {item.city}</div>
+                                                        <p className="text-xs text-slate-600 leading-relaxed mb-2">{item.desc}</p>
+                                                        {item.spots && item.spots.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                                {item.spots.map((spot, idx) => (
+                                                                    <span key={idx} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">📍 {spot.name}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Map Area */}
+                    <div className="flex-1 relative h-full bg-slate-200">
+                        <MapComponent activeId={activeId} data={itinerary} onMarkerClick={setActiveId} pickingMode={!!pickingTarget} onPickLocation={handlePickLocation} />
+                        
+                        {!isSidebarOpen && !pickingTarget && (
+                            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden absolute top-4 left-4 z-[1000] bg-white p-2 rounded-lg shadow-lg text-slate-700"><Icons.Menu /></button>
+                        )}
+
+                        {activeItem && activeItem.id !== 0 && !isEditing && !pickingTarget && (
+                            <div className="absolute bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-80 bg-white/95 backdrop-blur rounded-xl shadow-2xl p-4 z-[1000] border border-slate-200 animate-in fade-in slide-in-from-bottom-4">
+                                <h2 className="font-bold text-lg text-slate-800 mb-1">{activeItem.title}</h2>
+                                {activeItem.spots && activeItem.spots.length > 0 ? (
+                                    <div className="space-y-1">
+                                        {activeItem.spots.map((s, i) => (
+                                            <div key={i} className="text-xs text-slate-600 flex gap-2">
+                                                <span className="font-bold text-blue-600">·</span> 
+                                                <span><span className="font-semibold">{s.name}</span> <span className="text-slate-400">- {s.desc}</span></span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-slate-600">{activeItem.desc}</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
