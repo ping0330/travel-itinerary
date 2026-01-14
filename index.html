@@ -444,10 +444,22 @@
                 const map = mapInstanceRef.current;
                 if (!map) return;
 
+                // 確保 Leaflet 和 Polyline Decorator 已載入
+                if (typeof L === 'undefined' || typeof L.polylineDecorator === 'undefined') {
+                    console.warn('Leaflet or Polyline Decorator not loaded yet');
+                    return;
+                }
+
                 // Clear old layers
-                if (polylineRef.current) polylineRef.current.remove();
-                if (decoratorRef.current) decoratorRef.current.remove();
-                Object.values(markersRef.current).forEach(m => m.remove());
+                if (polylineRef.current) {
+                    try { polylineRef.current.remove(); } catch (e) {}
+                }
+                if (decoratorRef.current) {
+                    try { decoratorRef.current.remove(); } catch (e) {}
+                }
+                Object.values(markersRef.current).forEach(m => {
+                    try { m.remove(); } catch (e) {}
+                });
                 markersRef.current = {};
 
                 // Draw Line
@@ -456,72 +468,87 @@
                     .map(item => item.coords);
 
                 if (routePoints.length > 0) {
-                    polylineRef.current = L.polyline(routePoints, {
-                        color: '#6366f1', weight: 3, opacity: 0.6, dashArray: '10, 10', lineCap: 'round', className: 'animate-dash'
-                    }).addTo(map);
-                    
-                    // Add arrow decorators
-                    decoratorRef.current = L.polylineDecorator(polylineRef.current, {
-                        patterns: [
-                            {
-                                offset: '5%',
-                                repeat: 80,
-                                symbol: L.Symbol.arrowHead({
-                                    pixelSize: 10,
-                                    polygon: false,
-                                    pathOptions: {
-                                        stroke: true,
-                                        weight: 2,
-                                        color: '#6366f1',
-                                        opacity: 0.7
+                    try {
+                        polylineRef.current = L.polyline(routePoints, {
+                            color: '#6366f1', weight: 3, opacity: 0.6, dashArray: '10, 10', lineCap: 'round', className: 'animate-dash'
+                        }).addTo(map);
+                        
+                        // Add arrow decorators
+                        if (L.polylineDecorator && polylineRef.current) {
+                            decoratorRef.current = L.polylineDecorator(polylineRef.current, {
+                                patterns: [
+                                    {
+                                        offset: '5%',
+                                        repeat: 80,
+                                        symbol: L.Symbol.arrowHead({
+                                            pixelSize: 10,
+                                            polygon: false,
+                                            pathOptions: {
+                                                stroke: true,
+                                                weight: 2,
+                                                color: '#6366f1',
+                                                opacity: 0.7
+                                            }
+                                        })
                                     }
-                                })
-                            }
-                        ]
-                    }).addTo(map);
+                                ]
+                            }).addTo(map);
+                        }
+                    } catch (e) {
+                        console.error("Error drawing route:", e);
+                    }
                 }
 
                 // Draw Markers
-                data.forEach(item => {
-                    if (item.id === 0) return;
+                try {
+                    data.forEach(item => {
+                        if (item.id === 0) return;
 
-                    const createMarker = (coords, color, title, isSpot = false) => {
-                        if (!coords || coords[0] === 0) return;
-                        const size = isSpot ? 10 : 14;
-                        const anchor = isSpot ? 5 : 7;
-                        
-                        let hexColor = '#64748b';
-                        if(color.includes('orange')) hexColor = '#f97316';
-                        if(color.includes('blue')) hexColor = '#3b82f6';
-                        if(color.includes('cyan')) hexColor = '#06b6d4';
-                        if(color.includes('indigo')) hexColor = '#6366f1';
-                        if(isSpot) hexColor = '#ef4444';
+                        const createMarker = (coords, color, title, isSpot = false) => {
+                            if (!coords || coords[0] === 0) return;
+                            const size = isSpot ? 10 : 14;
+                            const anchor = isSpot ? 5 : 7;
+                            
+                            let hexColor = '#64748b';
+                            if(color.includes('orange')) hexColor = '#f97316';
+                            if(color.includes('blue')) hexColor = '#3b82f6';
+                            if(color.includes('cyan')) hexColor = '#06b6d4';
+                            if(color.includes('indigo')) hexColor = '#6366f1';
+                            if(isSpot) hexColor = '#ef4444';
 
-                        const icon = L.divIcon({
-                            className: isSpot ? 'custom-spot-icon' : 'custom-div-icon',
-                            html: `<div style="background-color: ${hexColor}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${isSpot ? 1 : 2}px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
-                            iconSize: [size, size],
-                            iconAnchor: [anchor, anchor]
-                        });
+                            try {
+                                const icon = L.divIcon({
+                                    className: isSpot ? 'custom-spot-icon' : 'custom-div-icon',
+                                    html: `<div style="background-color: ${hexColor}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${isSpot ? 1 : 2}px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
+                                    iconSize: [size, size],
+                                    iconAnchor: [anchor, anchor]
+                                });
 
-                        const m = L.marker(coords, { icon }).addTo(map);
-                        m.bindPopup(`<b>${title}</b>`);
-                        m.on('click', () => onMarkerClick(item.id));
-                        return m;
-                    };
+                                const m = L.marker(coords, { icon }).addTo(map);
+                                m.bindPopup(`<b>${title}</b>`);
+                                m.on('click', () => onMarkerClick(item.id));
+                                return m;
+                            } catch (e) {
+                                console.error("Error creating marker:", e);
+                                return null;
+                            }
+                        };
 
-                    // Draw spots or main marker
-                    if (item.spots && item.spots.length > 0) {
-                        item.spots.forEach((spot, idx) => {
-                            const m = createMarker(spot.coords, item.color, spot.name, true);
-                            if(m) markersRef.current[`spot-${item.id}-${idx}`] = m;
-                        });
-                    } else {
-                        const m = createMarker(item.coords, item.color, item.title, false);
-                        if(m) markersRef.current[`day-${item.id}`] = m;
-                    }
-                });
-            }, [data]);
+                        // Draw spots or main marker
+                        if (item.spots && item.spots.length > 0) {
+                            item.spots.forEach((spot, idx) => {
+                                const m = createMarker(spot.coords, item.color, spot.name, true);
+                                if(m) markersRef.current[`spot-${item.id}-${idx}`] = m;
+                            });
+                        } else {
+                            const m = createMarker(item.coords, item.color, item.title, false);
+                            if(m) markersRef.current[`day-${item.id}`] = m;
+                        }
+                    });
+                } catch (e) {
+                    console.error("Error drawing markers:", e);
+                }
+            }, [data, onMarkerClick]);
 
             // 4. FlyTo Active
             useEffect(() => {
