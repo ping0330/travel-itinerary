@@ -58,6 +58,21 @@
             z-index: 1000 !important;
         }
         
+        /* Leaflet Tooltip Custom Style */
+        .custom-tooltip {
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 12px;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .custom-tooltip::before {
+            border-top-color: rgba(0, 0, 0, 0.85);
+        }
+        
         /* Animation for the path - 使用多個選擇器確保命中 */
         .leaflet-interactive,
         path.leaflet-interactive,
@@ -481,9 +496,26 @@
 
                 if (routePoints.length > 0) {
                     try {
+                        // 繪製路線並加入動畫 class
                         polylineRef.current = L.polyline(routePoints, {
-                            color: '#6366f1', weight: 3, opacity: 0.6, dashArray: '10, 10', lineCap: 'round'
+                            color: '#6366f1', 
+                            weight: 3, 
+                            opacity: 0.6, 
+                            dashArray: '10, 10', 
+                            lineCap: 'round',
+                            className: 'route-line-animated'
                         }).addTo(map);
+                        
+                        // 強制加入動畫 class (使用 DOM 操作)
+                        setTimeout(() => {
+                            const pathElements = map.getPane('overlayPane').querySelectorAll('path');
+                            pathElements.forEach(path => {
+                                if (path.getAttribute('stroke') === '#6366f1' || path.style.stroke === 'rgb(99, 102, 241)') {
+                                    path.style.strokeDasharray = '10, 10';
+                                    path.style.animation = 'dash 30s linear infinite';
+                                }
+                            });
+                        }, 100);
                         
                         // Add arrow decorators
                         if (L.polylineDecorator && polylineRef.current) {
@@ -531,32 +563,56 @@
                             try {
                                 const icon = L.divIcon({
                                     className: isSpot ? 'custom-spot-icon' : 'custom-div-icon',
-                                    html: `<div style="background-color: ${hexColor}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${isSpot ? 1 : 2}px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="${title}"></div>`,
+                                    html: `<div style="background-color: ${hexColor}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${isSpot ? 1 : 2}px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); cursor: pointer;"></div>`,
                                     iconSize: [size, size],
                                     iconAnchor: [anchor, anchor]
                                 });
 
-                                const m = L.marker(coords, { icon, title: title }).addTo(map);
-                                m.bindPopup(`<b>${title}</b>`);
+                                const m = L.marker(coords, { 
+                                    icon, 
+                                    title: title,
+                                    alt: title
+                                }).addTo(map);
+                                
+                                // 綁定 popup
+                                m.bindPopup(`<b>${title}</b>`, {
+                                    closeButton: true,
+                                    autoClose: false
+                                });
+                                
+                                // 綁定 tooltip (滑鼠懸停顯示)
                                 m.bindTooltip(title, { 
                                     permanent: false, 
                                     direction: 'top',
-                                    offset: [0, -5],
-                                    opacity: 0.9
+                                    offset: [0, isSpot ? -8 : -10],
+                                    opacity: 0.9,
+                                    className: 'custom-tooltip'
                                 });
                                 
+                                // 點擊事件
                                 if (isSpot) {
-                                    // 景點標記：飛到景點位置
+                                    // 景點標記：飛到景點位置並放大
                                     m.on('click', (e) => {
-                                        L.DomEvent.stopPropagation(e);
-                                        map.flyTo(coords, 17, { animate: true, duration: 1.2 });
-                                        setTimeout(() => m.openPopup(), 1200);
+                                        e.originalEvent?.stopPropagation();
+                                        console.log(`Clicking spot: ${title} at`, coords);
+                                        map.flyTo(coords, 17, { 
+                                            animate: true, 
+                                            duration: 1.2,
+                                            easeLinearity: 0.25
+                                        });
+                                        setTimeout(() => {
+                                            m.openPopup();
+                                        }, 1300);
                                         onMarkerClick(item.id);
                                     });
                                 } else {
                                     // 日期標記：正常切換
-                                    m.on('click', () => onMarkerClick(item.id));
+                                    m.on('click', (e) => {
+                                        e.originalEvent?.stopPropagation();
+                                        onMarkerClick(item.id);
+                                    });
                                 }
+                                
                                 return m;
                             } catch (e) {
                                 console.error("Error creating marker:", e);
