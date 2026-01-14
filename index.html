@@ -53,8 +53,15 @@
             transition: all 0.3s ease;
         }
         
-        /* Animation for the path */
-        .leaflet-interactive {
+        .custom-spot-icon:hover {
+            transform: scale(1.3);
+            z-index: 1000 !important;
+        }
+        
+        /* Animation for the path - 使用多個選擇器確保命中 */
+        .leaflet-interactive,
+        path.leaflet-interactive,
+        polyline.leaflet-interactive {
             stroke-dasharray: 10, 10;
             animation: dash 30s linear infinite;
         }
@@ -524,17 +531,26 @@
                             try {
                                 const icon = L.divIcon({
                                     className: isSpot ? 'custom-spot-icon' : 'custom-div-icon',
-                                    html: `<div style="background-color: ${hexColor}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${isSpot ? 1 : 2}px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
+                                    html: `<div style="background-color: ${hexColor}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${isSpot ? 1 : 2}px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="${title}"></div>`,
                                     iconSize: [size, size],
                                     iconAnchor: [anchor, anchor]
                                 });
 
-                                const m = L.marker(coords, { icon }).addTo(map);
+                                const m = L.marker(coords, { icon, title: title }).addTo(map);
                                 m.bindPopup(`<b>${title}</b>`);
+                                m.bindTooltip(title, { 
+                                    permanent: false, 
+                                    direction: 'top',
+                                    offset: [0, -5],
+                                    opacity: 0.9
+                                });
+                                
                                 if (isSpot) {
                                     // 景點標記：飛到景點位置
-                                    m.on('click', () => {
-                                        map.flyTo(coords, 16, { animate: true, duration: 1 });
+                                    m.on('click', (e) => {
+                                        L.DomEvent.stopPropagation(e);
+                                        map.flyTo(coords, 17, { animate: true, duration: 1.2 });
+                                        setTimeout(() => m.openPopup(), 1200);
                                         onMarkerClick(item.id);
                                     });
                                 } else {
