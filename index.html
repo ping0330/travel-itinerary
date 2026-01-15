@@ -377,12 +377,31 @@
                     mapRef.current = {
                         flyToSpot: (coords, zoom = 17) => {
                             const map = mapInstanceRef.current;
-                            if (map && coords) {
-                                console.log('flyToSpot called:', coords, zoom);
+                            // 完整驗證座標
+                            if (!map || !mapReady) {
+                                console.warn('Map not ready for flyToSpot');
+                                return;
+                            }
+                            if (!coords || !Array.isArray(coords) || coords.length < 2) {
+                                console.warn('Invalid coords for flyToSpot:', coords);
+                                return;
+                            }
+                            const lat = parseFloat(coords[0]);
+                            const lng = parseFloat(coords[1]);
+                            if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+                                console.warn('Invalid lat/lng for flyToSpot:', lat, lng);
+                                return;
+                            }
+                            
+                            try {
+                                // 確保地圖尺寸正確（手機切換視圖時需要）
+                                map.invalidateSize();
+                                
+                                console.log('flyToSpot called:', lat, lng, zoom);
                                 
                                 // 計算當前中心與目標的距離
                                 const center = map.getCenter();
-                                const distance = map.distance(center, coords);
+                                const distance = map.distance(center, [lat, lng]);
                                 const currentZoom = map.getZoom();
                                 
                                 console.log('Distance to target:', distance, 'm');
@@ -390,20 +409,22 @@
                                 // 根據距離選擇不同的移動方式
                                 if (distance < 500) {
                                     // 很近（500m內）：平滑移動到中心
-                                    map.panTo(coords, { animate: true, duration: 0.5 });
+                                    map.panTo([lat, lng], { animate: true, duration: 0.5 });
                                     if (currentZoom < zoom) {
                                         setTimeout(() => map.setZoom(zoom, { animate: true }), 300);
                                     }
                                 } else if (distance < 5000) {
                                     // 中等距離（5km內）：平滑飛行
-                                    map.flyTo(coords, zoom, { animate: true, duration: 1 });
+                                    map.flyTo([lat, lng], zoom, { animate: true, duration: 1 });
                                 } else {
                                     // 較遠：先縮小再放大
-                                    map.setView(coords, Math.max(currentZoom - 3, 6), { animate: false });
+                                    map.setView([lat, lng], Math.max(currentZoom - 3, 6), { animate: false });
                                     setTimeout(() => {
-                                        map.flyTo(coords, zoom, { animate: true, duration: 1 });
+                                        map.flyTo([lat, lng], zoom, { animate: true, duration: 1 });
                                     }, 50);
                                 }
+                            } catch (e) {
+                                console.error('flyToSpot error:', e);
                             }
                         }
                     };
@@ -702,13 +723,27 @@
             // 4. FlyTo Active
             useEffect(() => {
                 const map = mapInstanceRef.current;
-                if (!map) return;
+                if (!map || !mapReady) return;
                 
                 const target = data.find(d => d.id === activeId);
-                if (target && target.coords && target.coords[0] !== 0) {
-                    map.flyTo(target.coords, target.zoom || 12, { animate: true, duration: 1.2 });
+                if (target && target.coords && Array.isArray(target.coords) && target.coords.length >= 2) {
+                    const lat = parseFloat(target.coords[0]);
+                    const lng = parseFloat(target.coords[1]);
+                    // 驗證座標是有效數字且不為 0
+                    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+                        // 延遲執行讓地圖容器有時間更新尺寸（手機版切換視圖時需要）
+                        const timer = setTimeout(() => {
+                            try {
+                                map.invalidateSize(); // 確保地圖尺寸正確
+                                map.flyTo([lat, lng], target.zoom || 12, { animate: true, duration: 1.2 });
+                            } catch (e) {
+                                console.error('FlyTo error:', e);
+                            }
+                        }, 100);
+                        return () => clearTimeout(timer);
+                    }
                 }
-            }, [activeId]);
+            }, [activeId, mapReady]);
 
             return <div ref={mapContainerRef} className="map-container bg-slate-100"></div>;
         };
@@ -1354,7 +1389,12 @@
                                                                             setActiveId(item.id);
                                                                             setMobileView('map');
                                                                             if (mapRef.current && spot.coords) {
-                                                                                setTimeout(() => mapRef.current.flyToSpot(spot.coords, 17), 300);
+                                                                                // 延遲 500ms 讓地圖視圖完全顯示並更新尺寸
+                                                                                setTimeout(() => {
+                                                                                    if (mapRef.current) {
+                                                                                        mapRef.current.flyToSpot(spot.coords, 17);
+                                                                                    }
+                                                                                }, 500);
                                                                             }
                                                                         }}
                                                                         className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 hover:bg-blue-100 hover:border-blue-400"
